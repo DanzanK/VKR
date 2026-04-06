@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Preprocessing Information</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 20px;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #0056b3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f8f8;
+        }
+        .images-section img, .components-section img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 10px 0;
+        }
+
+        .image-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px; /* Отступы между изображениями */
+        }
+
+        .component {
+            width: calc(50% - 10px); /* Устанавливаем ширину на 50% */
+            box-sizing: border-box;
+        }
+
+        .component img {
+            width: 100%;
+            height: auto;
+            display: block;
+            border-radius: 4px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EEG File Information - Extended</h1>
+
+        <div class="meta">
+            <h2>Meta Information</h2>
+            <table>
+                <tr><th>Start Time</th><td>{{ Start_time }}</td></tr>
+                <tr><th>Record</th><td>{{ Record }}</td></tr>
+                <tr><th>Excluded Channels (QC)</th><td>{{ excluded_channels }}</td></tr>
+            </table>
+        </div>
+
+        <div class="eeg-info">
+            <h2>EEG Processing Options</h2>
+            <table>
+                <tr><th>Low Frequency</th><td>{{ l_freq }} Hz</td></tr>
+                <tr><th>High Frequency</th><td>{{ h_freq }} Hz</td></tr>
+                <tr><th>Notch Frequency</th><td>{{ notch_freq }} Hz</td></tr>
+                <tr><th>Rereference Type</th><td>{{ reref }}</td></tr>
+                <tr><th>Downsample Frequency</th><td>{{ down_sfreq }} Hz</td></tr>
+                <tr><th>Number of Components</th><td>{{ n_components }}</td></tr>
+            </table>
+        </div>
+        
+        <div class="eeg-info">
+            <h2>Results of preprocessing</h2>
+            <table>
+                <tr><th>Excluded Indices</th><td>{{ exclude_idx }}</td></tr>
+                <tr><th>Excluded Labels</th><td>{{ exclude_labels }}</td></tr>
+            </table>
+        </div>
+
+        <div class="images-section">
+            <h2>Визуализации</h2>
+            
+            {% if filter_spectrum_image %}
+            <div class="image-item">
+                <h3>Filter Spectrum</h3>
+                <img src="{{ filter_spectrum_image }}" alt="Filter Spectrum">
+            </div>
+            {% endif %}
+            
+            {% if reref_spectrum_image %}
+            <div class="image-item">
+                <h3>Rereferenced Spectrum</h3>
+                <img src="{{ reref_spectrum_image }}" alt="Rereferenced Spectrum">
+            </div>
+            {% endif %}
+
+            {% if ica_spectrum_image %}
+            <div class="image-item">
+                <h3>ICA Spectrum</h3>
+                <img src="{{ ica_spectrum_image }}" alt="ICA Spectrum">
+            </div>
+            {% endif %}
+            
+            {% if ica_all_comp_image %}
+            <div class="image-item">
+                <h3>All ICA Components</h3>
+                <img src="{{ ica_all_comp_image }}" alt="All ICA Components">
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="components-section">
+            <h2>ICA Component Images</h2>
+            <div class="image-grid">
+                {% for comp_image in ica_each_comp_images %}
+                    <div class="component">
+                        <img src="{{ comp_image }}" alt="ICA Component Image">
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

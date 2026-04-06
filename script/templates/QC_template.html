@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quality Check</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 20px;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2 {
+            color: #0056b3;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f8f8f8;
+        }
+        .images-section img, .components-section img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>EEG File Information</h1>
+
+        <div class="meta">
+            <h2>Meta Information</h2>
+            <table>
+                <tr><th>ID</th><td>{{ id }}</td></tr>
+                <tr><th>Visit Number</th><td>{{ visit_num }}</td></tr>
+                <tr><th>Scenario</th><td>{{ scenario }}</td></tr>
+                <tr><th>Operator Code</th><td>{{ operator_code }}</td></tr>
+            </table>
+        </div>
+
+        <div class="eeg-info">
+            <h2>EEG Data Information</h2>
+            <table>
+                <tr><th>Data Files</th><td>{{ eeg_files }}</td></tr>
+                <tr><th>File .elc</th><td>{{ elc_file }}</td></tr>
+                <tr><th>Data Type</th><td>{{ raw_type }}</td></tr>
+                <tr><th>Duration</th><td>{{ duration }} seconds</td></tr>
+                <tr><th>Number of Channels</th><td>{{ nchan }}</td></tr>
+                <tr><th>All channel of montage</th><td>{{ electrodes_of_montages }}</td></tr>
+                <tr><th>ECG channel</th><td>{{ ecg_channel }}</td></tr>
+                <tr><th>EOG channel</th><td>{{ eog_channel }}</td></tr>
+                <tr><th>Sampling Frequency</th><td>{{ sfreq }} Hz</td></tr>
+                <tr><th>Measurement Date and Time</th><td>{{ measurement_datetime }}</td></tr>
+                <tr><th>Highpass</th><td>{{ highpass }} Hz</td></tr>
+                <tr><th>Lowpass</th><td>{{ lowpass }} Hz</td></tr>
+                <tr><th>Custom Reference Applied</th><td>{{ custom_ref_applied }}</td></tr>
+            </table>
+        </div>
+        
+        <div class="eeg-info">
+            <h2>Quality Check Options</h2>
+            <table>
+                <tr><th>Low Frequency</th><td>{{ l_freq }} Hz</td></tr>
+                <tr><th>High Frequency</th><td>{{ h_freq }} Hz</td></tr>
+                <tr><th>Notch frequency</th><td>{{ notch_freq }} Hz</td></tr>
+                <tr><th>Defined rejected channels</th><td>{{ excluded_channels }}</td></tr>
+                <tr><th>Type of searching noised channels</th><td>{{ noise_detector }}</td></tr>
+            </table>
+        </div>
+
+        <div class="eeg-info">
+            <h2>Result of qualitify checking</h2>
+            <table>
+                <tr><th>Count of initial events</th><td>{{Initial_Events}}</td></tr>
+                <tr><th>Count events after filtering</th><td>{{Filtered_Events}}</td></tr>
+                <tr><th>Expected count of events</th><td>{{Expected_Events}}</td></tr>    
+                <tr><th>SubSequence Flag</th><td>{{SubSeq_Flag}}</td></tr>     
+                <tr><th>Count of match indexes</th><td>{{Match_Indexes}}</td></tr> 
+                <tr><th>Count of Transitions</th><td>{{Transitions}}</td></tr>   
+                    
+                <tr><th>High Amplitude Channels</th><td>{{ HighAmp }}</td></tr>
+                <tr><th>Low Amplitude Channels</th><td>{{ LowAmp }}</td></tr>
+                <tr><th>Bridged Amplitude Channels</th><td>{{ Bridged }}</td></tr>
+                <tr><th>Noised Amplitude Channels</th><td>{{ Noise_Rate }}</td></tr>
+                <tr><th>Count of bads channels</th><td>{{ N_bad_channels }}</td></tr>
+            </table>
+        </div>
+
+        <div class="images-section">
+            <h2>Визуализации</h2>
+            {% if filter_image %}
+            <div class="image-item">
+                <h3>Spectrum before and after frequency filtering</h3>
+                <img src="{{ filter_image }}" alt="Частотные спектры">
+            </div>
+            {% endif %}
+            
+            {% if clusters_image %}
+            <div class="image-item">
+                <h3>Кластеры мостов</h3>
+                <img src="{{ clusters_image }}" alt="Кластеры мостов">
+            </div>
+            {% endif %}
+            
+            {% if hist_bridges_image %}
+            <div class="image-item">
+                <h3>Распределение пар мостов по корреляции</h3>
+                <img src="{{ hist_bridges_image }}" alt="Распределение пар мостов">
+            </div>
+            {% endif %}
+            
+            {% if Noised_channels_image %}
+            <div class="image-item">
+                <h3>График шумных каналов (SNR)</h3>
+                <img src="{{ Noised_channels_image }}" alt="График шумных каналов">
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
