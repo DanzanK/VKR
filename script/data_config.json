@@ -1,0 +1,9 @@
+{
+    "Data_path" : "C:/Users/Danzan/Desktop/quality check/31.03.26/DATA",
+    "QC_DataFrame_path" : "qc_report.csv",
+    "Scenarious" :  ["ANT"] ,
+    "Participant_IDs" : ["*"], 
+    "Visits": ["*"],
+    "hot" : true,
+    "exist_ok": false
+}
