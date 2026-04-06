@@ -1,0 +1,55 @@
+{
+    "Quality_Check": {
+        "l_freq": 0.1,
+        "h_freq": 45,
+        "notch_freq": 50,
+        "excluded_channels": ["EOG", "BIP1", "M1", "M2", "ECG", "RESP1"],
+        "noise_detector": "auto",
+        "stimulus_prefix": "Stimulus",
+        "stimulus_suffix": "s"
+    },
+
+    "Triggers": {
+        "RiTi": {
+            "main_codes": ["115", "130", "160", "120", "240"],
+            "expected_per_type": 300,
+            "tolerance_pct": 15
+        },
+        "ANT": {
+            "main_codes": ["140", "141", "142", "143", "144", "145", "146", "147", "148", "149", "150", "151", "152", "153", "154", "155"],
+            "expected_trials": 792,
+            "tolerance_pct": 18
+        },
+        "MMN": {
+            "main_codes": ["161", "162", "163"],
+            "expected_standard": 530,
+            "expected_deviant_total": 150,
+            "tolerance_pct": 20
+        },
+        "Rest": {
+            "main_codes": ["11", "12"],
+            "expected_closed": 5,
+            "expected_open": 5,
+            "tolerance_pct": 40
+        },
+        "N400": {
+            "main_codes": ["134", "135", "136", "137", "138", "139", "203", "204"],
+            "tolerance_pct": 25
+        },
+        "SSDs": {
+            "main_codes": ["25", "26", "1", "2", "3"],
+            "expected_go": 300,
+            "expected_stop": 100,
+            "tolerance_pct": 20
+        }
+    },
+
+    "Preprocessing": {
+        "common": {
+            "reref": "average",
+            "n_components": "auto",
+            "down_sfreq": 500,
+            "excluded_channels": ["EOG", "BIP1", "M1", "M2"]
+        }
+    }
+}
