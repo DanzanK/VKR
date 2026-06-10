@@ -1,55 +1,84 @@
-{
+{   
     "Quality_Check": {
-        "l_freq": 0.1,
-        "h_freq": 45,
-        "notch_freq": 50,
-        "excluded_channels": ["EOG", "BIP1", "M1", "M2", "ECG", "RESP1"],
-        "noise_detector": "auto",
-        "stimulus_prefix": "Stimulus",
-        "stimulus_suffix": "s"
+        "l_freq" : 0.1,
+        "h_freq" : 45,
+        "notch_freq" : 50,
+        "excluded_channels" : ["EOG", "BIP1", "M1", "M2", "ECG", "RESP1"],
+        "noise_detector" : "auto",
+        "stimulus" : ["Stimulus/s0", "Stimulus/s115", 
+                    "Stimulus/s130", "Stimulus/s160",
+                    "Stimulus/s120", "Stimulus/s240",
+                    "Stimulus/s1", "Stimulus/s11",
+                    "Stimulus/s12", "Stimulus/s2",
+                    "Stimulus/s3", "Stimulus/s4",
+                    "Stimulus/s3001"]
     },
+    "Metadata": {
+        "enabled": true,
+        "write_run_sidecars": true,
+        "write_global_registry": true,
 
-    "Triggers": {
-        "RiTi": {
-            "main_codes": ["115", "130", "160", "120", "240"],
-            "expected_per_type": 300,
-            "tolerance_pct": 15
-        },
+        "participants_file": null,
+        "experiment_manifest_file": null,
+        "equipment_file": null,
+        "impedance_file": null,
+
+        "coordinate_system": "custom .elc / unknown",
+        "coordinate_units": "m",
+        "trigger_channel": null
+    },
+    "Preprocessing": {
         "ANT": {
-            "main_codes": ["140", "141", "142", "143", "144", "145", "146", "147", "148", "149", "150", "151", "152", "153", "154", "155"],
-            "expected_trials": 792,
-            "tolerance_pct": 18
+            "reref" : "average",
+            "n_components" : 10,
+            "low_freq" : 0.1,
+            "high_freq" : 40,
+            "notch_freq" : null,
+            "down_sfreq" : 128,
+            "excluded_channels" : ["M1", "M2"]
         },
-        "MMN": {
-            "main_codes": ["161", "162", "163"],
-            "expected_standard": 530,
-            "expected_deviant_total": 150,
-            "tolerance_pct": 20
-        },
-        "Rest": {
-            "main_codes": ["11", "12"],
-            "expected_closed": 5,
-            "expected_open": 5,
-            "tolerance_pct": 40
-        },
-        "N400": {
-            "main_codes": ["134", "135", "136", "137", "138", "139", "203", "204"],
-            "tolerance_pct": 25
-        },
-        "SSDs": {
-            "main_codes": ["25", "26", "1", "2", "3"],
-            "expected_go": 300,
-            "expected_stop": 100,
-            "tolerance_pct": 20
+        "RiTi": {
+            "reref" : "average",
+            "n_components" : "auto",
+            "l_freq" : 0.1,
+            "h_freq" : 45,
+            "notch_freq" : 50,
+            "down_sfreq" : 2048,
+            "excluded_channels" : ["M1", "M2", "EOG", "BIP1"]
         }
     },
-
-    "Preprocessing": {
-        "common": {
-            "reref": "average",
-            "n_components": "auto",
-            "down_sfreq": 500,
-            "excluded_channels": ["EOG", "BIP1", "M1", "M2"]
+    
+    "Processing" : 
+    {
+        "RiTi":
+        {   
+            "stimulus_list": ["Stimulus/s115", "Stimulus/s130", "Stimulus/s160",
+                            "Stimulus/s120", "Stimulus/s240"],
+            "tmin": -0.2, 
+            "tmax": 0.8,
+            "baseline" : [null, 0],
+            "roi" : ["Fz", "T7", "Cz", "T8", "Pz", "O1", "O2"]
+        },
+    
+        "ANT":
+        {   
+            "stimulus_list": ["Stimulus/s143", "Stimulus/s145", "Stimulus/s149", 
+                            "Stimulus/s151", "Stimulus/s141", "Stimulus/s147", 
+                            "Stimulus/s153", "Stimulus/s155"],
+            "tmin" : -0.15, 
+            "tmax": 0.75,
+            "baseline" : [null, 0]
+        },
+    
+        "MMNs":
+        {   
+            "stimulus_list": ["Stimulus/s1", "Stimulus/s2", "Stimulus/s3", 
+                            "Stimulus/s4", "Stimulus/s9", "Stimulus/s10", 
+                            "Stimulus/s161", "Stimulus/s162", "Stimulus/s163"],
+            "tmin" : -0.15, 
+            "tmax": 0.75,
+            "baseline" : [null, 0],
+             "roi" : ["Fz", "T7", "Cz", "T8", "Pz", "O1", "O2"]
         }
     }
 }
