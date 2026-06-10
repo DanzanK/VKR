@@ -3,3 +3,5 @@
 Кюнкриков Даниил Саналович (НПИмд-01-24, 1132249574)
 
 Материалы по выполнению Выпускной квалификационной работы
+
+[Пример сырых данных для тестирования]([https://example.com](https://drive.google.com/file/d/1ipgdJ3H2RZvCzRhc5bgOSO59byNoKG6k/view?usp=drive_link))
