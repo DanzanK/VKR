@@ -9,14 +9,30 @@ from typing import Optional, Tuple, Dict, Any
 _SCENARIO_ALIASES = {
     "ants": "ANT",
     "ant": "ANT",
+    "attentionnetworktest": "ANT",
+
     "mmns": "MMN",
     "mmn": "MMN",
-    
+    "mismatchnegativity": "MMN",
+
+    "assr": "ASSR",
+    "auditorysteadystateresponse": "ASSR",
+
     "riti": "RiTi",
+    "rit": "RiTi",
     "rise": "RiTi",
     "risetime": "RiTi",
     "rise_time": "RiTi",
     "rise-time": "RiTi",
+
+    "vft": "VFT",
+    "vft6": "VFT6",
+    "visualfrequencytagging": "VFT",
+
+    "n400": "N400",
+    "picturematch": "PictureMatch",
+    "picture_match": "PictureMatch",
+    "picture-match": "PictureMatch",
 
     "ssds": "SST",
     "sst": "SST",
@@ -37,28 +53,16 @@ def extract_visit_num_from_path(path: str):
 
 def canonical_scenario(name: str) -> str:
     """
-    Приводим 'ANTs', 'ant', 'rs11' -> каноническому ключу.
+    Normalize scenario names used in folders/files.
+    Display labels may remain raw elsewhere; this key is for QC logic.
     """
     if not name:
         return "UNKNOWN"
-    s = str(name).strip().lower().replace(" ", "").replace("-", "").replace("_", "")
-    # rs11/rs12/rs13/rs21/rs22/rs23 -> Rest
-    if re.fullmatch(r"rs\d\d", s):
+    raw = str(name).strip()
+    s = raw.lower().replace(" ", "").replace("-", "").replace("_", "")
+    if re.fullmatch(r"rs\d+", s):
         return "Rest"
-    return _SCENARIO_ALIASES.get(s, name.strip())
-
-    mapping = {
-        "ants": "ant",
-        "ant": "ant",
-        "mmns": "mmn",
-        "mmn": "mmn",
-        "ssds": "sst",
-        "sst": "sst",
-        "spch": "speech",
-        "speech": "speech",
-        "riti": "riti",
-    }
-    return mapping.get(s, s)
+    return _SCENARIO_ALIASES.get(s, raw)
 
 
 
@@ -362,6 +366,7 @@ def get_file_info(file_path, elc_path):
 
     data = {
         "id": meta.get("id", "N/A"),
+        "record_type": meta.get("prefix", prefix_f) if meta.get("prefix", prefix_f) in ("INP", "RNS") else "UNKNOWN",
         "visit_num": visit_num,
         "scenario": scenario,
         "scenario_raw": scenario_raw,

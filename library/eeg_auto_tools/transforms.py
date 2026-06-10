@@ -15,7 +15,7 @@ from scipy.signal import savgol_filter
 #from mne_icalabel import label_components
 
 from .savers import compared_snr
-from .quality_check import detect_bad_channels, compared_spectrum, compute_bad_epochs, set_montage
+from .quality_check import detect_bad_channels, compared_spectrum, compute_bad_epochs, set_montage, get_last_bad_channel_qc_report
 from .scenarious import preprocessing_events
 from .metrics import calculate_SN_ratio
 from .craft_events import make_ANT_events, make_RiTi_events, make_CB_events
@@ -306,28 +306,54 @@ class Cropping(Transform):
         return raw
 
 class FilterBandpass(Transform):
-    def __init__(self, l_freq:float, h_freq:float, notch_freq:float=None, 
-                 method:str='fir', fir_design:str='firwin', report:bool=True):
+    def __init__(self, l_freq: float, h_freq: float, notch_freq: float = None,
+                 method: str = 'fir', fir_design: str = 'firwin',
+                 report: bool = True, n_jobs: int = 1):
         self.l_freq = l_freq
         self.h_freq = h_freq
         self.notch_freq = notch_freq
         self.method = method
         self.fir_design = fir_design
         self.report = report
+        # n_jobs=-1 caused unstable VM/joblib behavior on long recordings.
+        # Keep the legacy block deterministic and memory-safe by default.
+        self.n_jobs = int(n_jobs) if n_jobs not in (None, "cuda") else 1
         self.repo_images = {}
         self.repo_data = {}
 
-    def forward(self, raw:mne.io.Raw) -> mne.io.Raw:
+    def forward(self, raw: mne.io.Raw) -> mne.io.Raw:
         raw_filtered = raw.copy()
         if self.notch_freq:
-            raw_filtered = raw_filtered.notch_filter(freqs=self.notch_freq, method=self.method, fir_design=self.fir_design, 
-                                pad='reflect_limited', phase='zero-double', verbose=False, n_jobs='cuda' if mne.cuda.get_config()['MNE_USE_CUDA']=='true' else -1)
-        raw_filtered = raw_filtered.filter(l_freq=self.l_freq, h_freq=self.h_freq, method=self.method, fir_design=self.fir_design, 
-                        pad='reflect_limited', phase='zero-double', verbose=False, n_jobs='cuda' if mne.cuda.get_config()['MNE_USE_CUDA']=='true' else -1)
+            raw_filtered = raw_filtered.notch_filter(
+                freqs=self.notch_freq,
+                method=self.method,
+                fir_design=self.fir_design,
+                pad='reflect_limited',
+                phase='zero-double',
+                verbose=False,
+                n_jobs=self.n_jobs,
+            )
+        raw_filtered = raw_filtered.filter(
+            l_freq=self.l_freq,
+            h_freq=self.h_freq,
+            method=self.method,
+            fir_design=self.fir_design,
+            pad='reflect_limited',
+            phase='zero-double',
+            verbose=False,
+            n_jobs=self.n_jobs,
+        )
         if self.report:
-            fig = compared_spectrum(raw, raw_filtered, fmin=0, fmax=min(100, raw.info['sfreq']/2))
+            fig = compared_spectrum(raw, raw_filtered, fmin=0, fmax=min(100, raw.info['sfreq'] / 2))
             self.repo_images = {'Spectrum': fig}
-            self.repo_data = {}
+            self.repo_data = {
+                "filter_l_freq": self.l_freq,
+                "filter_h_freq": self.h_freq,
+                "filter_notch_freq": self.notch_freq,
+                "filter_method": self.method,
+                "filter_fir_design": self.fir_design,
+                "filter_n_jobs": self.n_jobs,
+            }
         return raw_filtered
 
 
@@ -374,6 +400,7 @@ class BadChannelsDetector(Transform):
         self.mark = mark
         self.repo_images = {}
         self.repo_data = {}
+        self.detection_report = {}
 
     @staticmethod
     def _placeholder_fig(text: str):
@@ -394,22 +421,22 @@ class BadChannelsDetector(Transform):
 
     def forward(self, raw):
         self.electrodesD, clusters, bridge_figs, noised_fig = detect_bad_channels(raw.copy(), self.method)
+        self.detection_report = get_last_bad_channel_qc_report()
 
-        # гарантируем наличие ключей + список
-        for k in ("HighAmp", "LowAmp", "Bridged", "Noise_Rate"):
+        source_keys = ("HighAmp", "LowAmp", "Bridged", "Noise_Rate")
+        for k in source_keys:
             self.electrodesD[k] = self._to_list(self.electrodesD.get(k, []))
 
-        # объединяем всё в итоговые bads
         bad_channels = []
-        for v in self.electrodesD.values():
-            bad_channels.extend(self._to_list(v))
+        for k in source_keys:
+            bad_channels.extend(self._to_list(self.electrodesD.get(k, [])))
 
         united_bad_channels = sorted(set(bad_channels) | set(raw.info.get("bads", [])))
+        self.bad_channels = united_bad_channels
         if self.mark:
             raw.info["bads"] = united_bad_channels
 
         if self.report:
-            # bridge_figs может быть [], а noised_fig может быть None -> делаем заглушки
             clusters_fig = bridge_figs[0] if isinstance(bridge_figs, list) and len(bridge_figs) > 0 else None
             hist_fig = bridge_figs[1] if isinstance(bridge_figs, list) and len(bridge_figs) > 1 else None
 
@@ -420,21 +447,27 @@ class BadChannelsDetector(Transform):
             if noised_fig is None:
                 noised_fig = self._placeholder_fig(f"No noised-channels figure for method={self.method}")
 
-            # порядок важен! (твой developments.py ожидает [0],[1],[2])
             self.repo_images = {
                 "Bridged_channels": clusters_fig,
                 "Bridged_hist": hist_fig,
                 "Noised_channels": noised_fig,
             }
 
+            counts_by_source = {k: len(self.electrodesD.get(k, [])) for k in source_keys}
+            threshold_report = (self.detection_report or {}).get("thresholds", {})
+
             self.repo_data = {
                 **{"Clusters": clusters},
                 **self.electrodesD,
-                **{"FINAL": united_bad_channels},
+                **{
+                    "FINAL": united_bad_channels,
+                    "BadChannelCountsBySource": counts_by_source,
+                    "BadChannelThresholds": threshold_report,
+                    "BadChannelDetectionReport": self.detection_report,
+                },
             }
 
         return raw
-
 
 
 class AutoICA(Transform):

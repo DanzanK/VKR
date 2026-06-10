@@ -21,6 +21,41 @@ from .metrics import isolation_forest, check_volt_of_epochs
 from .scenarious import verificate_events, is_subsequence
 from .montages import create_custom_montage, read_elc, align_head
 
+
+# ============================================================
+# Machine-readable bad-channel detection diagnostics
+# ============================================================
+
+LAST_BAD_CHANNEL_QC_REPORT = {}
+
+def _to_builtin(value):
+    """Convert numpy values/arrays into JSON-friendly Python objects."""
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating,)):
+        return float(value)
+    if isinstance(value, (np.bool_,)):
+        return bool(value)
+    if isinstance(value, dict):
+        return {str(k): _to_builtin(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_to_builtin(v) for v in value]
+    return value
+
+def get_last_bad_channel_qc_report():
+    """Return diagnostics from the last detect_bad_channels() call.
+
+    The QC pipeline reads this to explain where N_bad_channels came from.
+    """
+    return _to_builtin(LAST_BAD_CHANNEL_QC_REPORT)
+
+def _set_last_bad_channel_qc_report(report):
+    global LAST_BAD_CHANNEL_QC_REPORT
+    LAST_BAD_CHANNEL_QC_REPORT = _to_builtin(report or {})
+
+
 def compute_bad_epochs(epochs, snr_matrix, roi_channels=None, thr_auto=True):
     n_trials, n_channels, n_times = epochs._data.shape
     ch_names = epochs.ch_names 
@@ -129,38 +164,105 @@ def set_montage(raw, montage, elc_file, mode, threshold, verbose=False, interpol
     return raw
 
 
-def detect_bad_channels(raw, method='auto'):
-    raw = raw.copy().pick_types(eeg=True, exclude=[])
-    if len(raw.ch_names) < 3:
-        return {"HighAmp": [], "LowAmp": [], "Bridged": [], "Noise_Rate": []}, [], [], []
+def detect_bad_channels(raw, method='auto',
+                        threshold_min=3e-6,
+                        threshold_max=300e-6,
+                        threshold_length=0.5,
+                        bridge_threshold=0.99,
+                        noise_threshold=0.8):
+    """Detect bad EEG channels and keep machine-readable diagnostics.
 
+    Returns the historical 4-tuple expected by eeg_auto_tools:
+    (electrodesD, clusters, bridge_figs, noised_fig)
+
+    In addition, get_last_bad_channel_qc_report() exposes thresholds, per-channel
+    scores, counts by source, and the final union used by BadChannelsDetector.
+    """
+    raw = raw.copy().pick_types(eeg=True, exclude=[])
+    method_used = method
+    report = {
+        "method": method_used,
+        "thresholds": {
+            "flat_threshold_min_v": float(threshold_min),
+            "high_threshold_max_v": float(threshold_max),
+            "threshold_length_fraction": float(threshold_length),
+            "bridge_correlation_threshold": float(bridge_threshold),
+            "snr_noise_probability_threshold": float(noise_threshold),
+        },
+        "n_eeg_channels_input": int(len(raw.ch_names)),
+        "flat_scores": {},
+        "high_amp_scores": {},
+        "bridge_clusters": [],
+        "noise_scores": {},
+        "counts_by_source": {"HighAmp": 0, "LowAmp": 0, "Bridged": 0, "Noise_Rate": 0},
+        "final_bad_channels": [],
+        "error": None,
+    }
+
+    if len(raw.ch_names) < 3:
+        electrodesD = {"HighAmp": [], "LowAmp": [], "Bridged": [], "Noise_Rate": []}
+        _set_last_bad_channel_qc_report(report)
+        return electrodesD, [], [], []
 
     bad_channels = []
     scores = []
+    noised_fig = None
     electrodesD = {}
-    flat_chans, noisy_channels, _, _ = get_flat_channels(raw)
-    clusters, bridge_figs = search_bridge_cluster(raw)
-    bridged_electrodes = list(set(list(chain.from_iterable(clusters))))
-    raw = raw.drop_channels(np.concatenate([flat_chans, noisy_channels, bridged_electrodes]))
-    if method == 'ransac':
-        bad_channels, scores, noised_fig = DNC_ransac(raw)
-    elif method == 'ed':
-        bad_channels, scores, noised_fig = DNC_electrical_distance(raw)
-    elif method == 'corr':
-        bad_channels, scores, noised_fig = DNC_corr(raw)
-    elif method == 'lof':
-        bad_channels, scores = mne.preprocessing.find_bad_channels_lof(raw, metric="euclidean", return_scores=True, verbose=False)
-    elif method in ['auto', 'SN_ratio']:
-        bad_channels, scores, noised_fig = DNC_SN_ratio(raw)
-    else:
-        raise ValueError(f"Unknown method '{method}'. Please use 'ransac', 'neighbours', 'psd', 'ed', 'corr' or 'auto'")
-    
-    electrodesD['HighAmp'] = noisy_channels
-    electrodesD['LowAmp'] = flat_chans
-    electrodesD['Bridged'] = bridged_electrodes
-    electrodesD['Noise_Rate'] = bad_channels
-    return electrodesD, clusters, bridge_figs, noised_fig
-    
+
+    try:
+        flat_chans, noisy_channels, empty_scores, max_scores = get_flat_channels(
+            raw,
+            threshold_min=threshold_min,
+            threshold_max=threshold_max,
+            threshold_length=threshold_length,
+        )
+        report["flat_scores"] = {ch: float(sc) for ch, sc in zip(raw.ch_names, empty_scores)}
+        report["high_amp_scores"] = {ch: float(sc) for ch, sc in zip(raw.ch_names, max_scores)}
+
+        clusters, bridge_figs = search_bridge_cluster(raw, threshold=bridge_threshold)
+        report["bridge_clusters"] = clusters
+        bridged_electrodes = list(set(list(chain.from_iterable(clusters))))
+
+        drop_for_noise = list(set(list(flat_chans) + list(noisy_channels) + list(bridged_electrodes)))
+        raw_noise = raw.copy()
+        if drop_for_noise:
+            raw_noise = raw_noise.drop_channels([ch for ch in drop_for_noise if ch in raw_noise.ch_names])
+
+        if method == 'ransac':
+            bad_channels, scores, noised_fig = DNC_ransac(raw_noise)
+            report["noise_scores"] = {ch: float(sc) for ch, sc in zip(bad_channels, scores)}
+        elif method == 'ed':
+            bad_channels, scores, noised_fig = DNC_electrical_distance(raw_noise)
+            report["noise_scores"] = {ch: float(sc) for ch, sc in zip(bad_channels, scores)}
+        elif method == 'corr':
+            bad_channels, scores, noised_fig = DNC_corr(raw_noise)
+            report["noise_scores"] = {ch: float(sc) for ch, sc in zip(bad_channels, scores)}
+        elif method == 'lof':
+            bad_channels, scores = mne.preprocessing.find_bad_channels_lof(raw_noise, metric="euclidean", return_scores=True, verbose=False)
+            noised_fig = None
+            report["noise_scores"] = {ch: float(sc) for ch, sc in zip(bad_channels, scores)}
+        elif method in ['auto', 'SN_ratio']:
+            bad_channels, scores, noised_fig = DNC_SN_ratio(raw_noise, noise_threshold=noise_threshold)
+            report["noise_scores"] = {ch: float(sc) for ch, sc in zip(bad_channels, scores)}
+        else:
+            raise ValueError(f"Unknown method '{method}'. Please use 'ransac', 'ed', 'corr', 'lof', 'SN_ratio' or 'auto'")
+
+        electrodesD['HighAmp'] = np.asarray(noisy_channels).tolist()
+        electrodesD['LowAmp'] = np.asarray(flat_chans).tolist()
+        electrodesD['Bridged'] = list(bridged_electrodes)
+        electrodesD['Noise_Rate'] = list(bad_channels)
+
+        final_bad = sorted(set(electrodesD['HighAmp']) | set(electrodesD['LowAmp']) | set(electrodesD['Bridged']) | set(electrodesD['Noise_Rate']))
+        report["counts_by_source"] = {k: int(len(v)) for k, v in electrodesD.items()}
+        report["final_bad_channels"] = final_bad
+        report["n_final_bad_channels"] = int(len(final_bad))
+        _set_last_bad_channel_qc_report(report)
+        return electrodesD, clusters, bridge_figs, noised_fig
+
+    except Exception as exc:
+        report["error"] = str(exc)
+        _set_last_bad_channel_qc_report(report)
+        raise
 
 def get_flat_channels(raw, threshold_min=3e-6, threshold_max=300e-6, threshold_length=0.5):
     picks = mne.pick_types(raw.info, eeg=True, exclude=[])
@@ -455,7 +557,7 @@ def DNC_SN_ratio(raw, noise_threshold=0.8, optimized=False):
         return ch_name, snr_db
 
     if optimized:
-        results = Parallel(n_jobs=4)(
+        results = Parallel(n_jobs=1)(
             delayed(process_channel)(ch_idx) for ch_idx in range(len(ch_names))
         )
     else:
